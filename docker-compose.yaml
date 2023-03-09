@@ -1,0 +1,59 @@
+version: "3"
+services:
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - "6380:6379"
+      
+  migration:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile.migration
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - AUTH_DB_USERNAME = postgres
+      - AUTH_DB_PASSWORD = postgres
+      - AUTH_DATABASE = auth
+      - AUTH_DB_HOST = db   
+      - AUTH_DB_PORT = 5432
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: auth
+    ports:
+      - "5433:5432"
+    volumes:
+      - ../auth/database/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "4000:4000"
+    environment:
+      - JWT_SECRET_KEY = code_jwt_secret_key
+      - TOKEN_HEADER_KEY = code_token_header_key
+      - AUTH_DB_USERNAME = postgres
+      - AUTH_DB_PASSWORD = 'postgres'
+      - AUTH_DATABASE = 'auth'
+      - AUTH_DB_HOST = db   
+      - AUTH_DB_PORT = 5432
+      - REDIS_HOST = docker.for.mac.localhost
+      - REDIS_PORT = 6379
+  
